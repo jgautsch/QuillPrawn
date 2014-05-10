@@ -10,110 +10,86 @@ get '/' do
 end
 
 post '/document' do
-	puts params
-	hash = JSON.parse(params[:content])
-	pp hash
-	qp = QuillPrawn.new(hash)
+	content = JSON.parse(params[:content])
+	qp = QuillPrawn.new(content)
 	qp.generate
-  # respond_with 200
 end
+
+class Transformer
+
+	def initialize(op)
+		@op = op
+		set_value
+		build_styles
+		add_links
+		set_font
+		set_size
+	end
+
+	
+	def to_hash
+		@content_object
+	end
+
+	
+	def set_value
+		@content_object = {text: @op["value"]}
+	end
+
+	
+	def build_styles
+		@styles = []
+		@styles << :underline if @op["attributes"]["underline"]
+		@styles << :bold 			if @op["attributes"]["bold"]
+		@styles << :italic 		if @op["attributes"]["italic"]
+		@content_object[:styles] = @styles
+	end
+
+	
+	def add_links
+		if @op["attributes"]["link"]
+			@content_object[:styles] = @content_object[:styles] << :underline
+			@content_object[:color] = "0000EE"
+		end
+	end
+
+	
+	def set_font
+		case @op["attributes"]["font"]
+		when "monospace"
+			@content_object[:font] = "Courier"
+		when "serif"
+			@content_object[:font] = "Times-Roman"
+		end
+	end
+
+	
+	def set_size
+		if @op["attributes"]["size"]
+			@content_object[:size] = @op["attributes"]["size"].gsub("px","").to_i 
+		end
+	end
+end
+
+
 
 class QuillPrawn < Prawn::Document
 
   def initialize(content)
     super()
-
     @content = content
   end
+
 
   def generate
   	span(450, :position => :center) do
   		formatted_text transformed_content
-  		# content["ops"].each do |op|
-  		# 	text op["value"]
-  		# end
   	end
-
   	render_file "example_#{Time.now.to_s}.pdf"
   end
 
+
   def transformed_content
-  	@content["ops"].map { |op| transform_op(op) }
-  end
-
-  def transform_op(op)
-  	puts "transforming: #{op}"
-  	hash = {}
-  	styles = []
-  	hash[:text] = op["value"]
-  	styles << :underline if op["attributes"]["underline"]
-  	styles << :bold if op["attributes"]["bold"]
-  	styles << :italic if op["attributes"]["italic"]
-  	if op["attributes"]["link"]
-  		styles << :underline
-  		hash[:color] = "0000EE"
-  	end
-
-  	if op["attributes"]["font"] == "monospace"
-  		hash[:font] = "Courier"
-  	end
-
-  	if op["attributes"]["font"] == "serif"
-  		hash[:font] = "Times-Roman"
-  	end
-
-  	hash[:styles] = styles
-  	hash[:size] = op["attributes"]["size"].gsub("px","").to_i if op["attributes"]["size"]
-  	hash
+  	@content["ops"].map { |op| Transformer.new(op).to_hash }
   end
 end
-
-
-# class QuillPrawn
-# 	def initialize(content)
-# 		@content = content
-# 	end
-
-# 	def transformed_content
-# 		@content.map { |op| transform_op(op) }
-# 	end
-
-# 	def transform_op(op)
-# 		hash = {}
-# 		styles = []
-# 		hash[:text] = op["value"]
-# 		styles << :underline if op["attributes"]["underline"]
-# 		styles << :bold if op["attributes"]["bold"]
-# 		styles << :italic if op["attributes"]["italic"]
-# 		hash[:styles] = styles
-# 		hash[:size] = op["attributes"]["size"].gsub("px","").to_i if op["attributes"]["size"]
-# 		hash
-# 	end
-
-# 	def print
-# 		Prawn::Document.generate("implicit_#{Time.now.to_s}.pdf") do
-# 			span(450, :position => :center) do
-# 				formatted_text transformed_content
-# 				# content["ops"].each do |op|
-# 				# 	text op["value"]
-# 				# end
-# 			end
-# 		end
-
-# 		# formatted_text [ { :text => "Some bold. ", :styles => [:bold] },
-# 		#  { :text => "Some italic. ", :styles => [:italic] },
-# 		#  { :text => "Bold italic. ", :styles => [:bold, :italic] },
-# 		#  { :text => "Bigger Text. ", :size => 20 },
-# 		#  { :text => "More spacing. ", :character_spacing => 3 },
-# 		#  { :text => "Different Font. ", :font => "Courier" },
-# 		#  { :text => "Some coloring. ", :color => "FF00FF" },
-# 		#  { :text => "Link to the wiki. ",
-# 		#  :color => "0000FF",
-# 		#  :link => "https://github.com/prawnpdf/prawn/wiki" },
-# 		#  { :text => "Link to a local file. ",
-# 		#  :color => "0000FF",
-# 		#  :local => "./local_file.txt" }
-# 		#  ]
-
-# 	end
-# end
